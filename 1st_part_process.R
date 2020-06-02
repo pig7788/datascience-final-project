@@ -122,7 +122,7 @@ doProcessing <- function(data, mode) {
   
   write.table(first_part_processed_data,
               file = paste0(getwd(), "/data/first_part_processed_data_", mode, ".csv"),
-              quote = F,
+              quote = T,
               sep = ",",
               row.names = F)
 }
