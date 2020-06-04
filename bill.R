@@ -12,21 +12,25 @@ third_part <- c(index_column, "slope", "vessels", "thalium_scan")
 # define new added column, make sure the length can divided by 2
 first_added <- c("age", "resting_bp", "cholestoral")
 second_added <- c("cholestoral", "max_rate", "st_depression")
-third_added <- c()
+third_added <- c("thalium_scan")
 
 # define plot information, make sure the length is as same as part
-plot_dir <- "plot"
+plot_dir <- "/plots"
 plot_kind <- list(a=c("box", "Range"), b=c("bar", "Count"))
 first_plot <- c(0, 2, 1, 1, 2, 2)
+second_plot <- c(0, 2, 1, 1, 2, 2)
+third_plot <- c(0, 2, 2,2)
 
 # define new csv file name
 first_csv <- "/data/first_part_processed_data_"
+second_csv <- "/data/second_part_processed_data_"
+third_csv <- "/data/third_part_processed_data_"
 
 # hash dictionary
 params <- hash()
-params[["1"]] <- list(part=first_part, added=first_added, answer=answer_column, plot=first_plot, ranger=list(a=c(17, 40, 65), b=c(120, 139), c=c(129, 200, 239)))
-params[["2"]] <- list(part=second_part, added=second_added, answer=answer_column, ranger=list())
-params[["3"]] <- list(part=third_part, added=third_added, answer=answer_column, ranger=list())
+params[["1"]] <- list(id="first", csv=first_csv, part=first_part, added=first_added, answer=answer_column, plot=first_plot, ranger=list(a=c(17, 40, 65), b=c(120, 139), c=c(129, 200, 239)))
+params[["2"]] <- list(id="second", csv=second_csv, part=second_part, added=second_added, answer=answer_column, plot=second_plot, ranger=list())
+params[["3"]] <- list(id="third", missing_index=c(3,4), missing_value=list(a=c(123,147,220,228), b=c(63,201)), csv=third_csv, part=third_part, added=third_added, answer=answer_column, plot=third_plot, ranger=list())
 
 #    define some function
 save2img <- function(target, file_name, plot_type, main_title, x_title, y_title) {
@@ -49,27 +53,11 @@ save2img <- function(target, file_name, plot_type, main_title, x_title, y_title)
     dev.off()
 }
 
-do_corr_process <- function(data) {
-    corr_processed_data <- data.frame(data$id,
-                                                                        data$age,
-                                                                        data$sex,
-                                                                        data$chest_pain,
-                                                                        data$resting_bp,
-                                                                        data$cholestoral,
-                                                                        data$heart_disease)
-    headers <- c("id",
-                             "age",
-                             "sex",
-                             "chest_pain",
-                             "resting_bp",
-                             "cholestoral",
-                             "heart_disease")
-
+do_corr_process <- function(data, headers, id) {
+    corr_processed_data <- data
     names(corr_processed_data) <- headers
-    
     corr_matrix <- cor(corr_processed_data)
-    
-    save2img(corr_matrix, "/plots/first_part_corr_plot.png", "corr", "", "", "")
+    save2img(corr_matrix, paste(plot_dir, "/", id, "_part_corr_plot.png", sep=""), "corr", "", "", "")
 }
 
 get_headers <- function(data, params, mode, headers){
@@ -96,7 +84,7 @@ get_headers <- function(data, params, mode, headers){
                         x_title <- colname
                         y_title <- plot_kind[[j]][[2]]
                         file_name = paste(plot_dir, "/", colname, "_", type, "plot.png", sep="")
-                        # save2img(data, file_name, type, main_title, x_title, y_title)
+                        save2img(data[[colname]], file_name, type, main_title, x_title, y_title)
                     }
                 }
             }
@@ -106,18 +94,30 @@ get_headers <- function(data, params, mode, headers){
     return(headers)
 }
 
-doProcessing <- function(data, mode, params) {
+doProcessing <- function(data, mode, params, part) {
   
     add_postfix <- c("_without_label", "_with_label")
     headers <- c(index_column)
+    rearrange_ranger <- c()
         
     # use kmeans to cut bins
     if(length(params$ranger) == 0){
-        message("not implemented !")
+        message("ranger not implemented !")
     # use self defined bins to cut bins
     }else{
         message("ranger has been defined !")
     }
+    
+    # missing value
+    if (length(params$missing_value > 0)){
+        for (i in seq(1, length(params$missing_value), by=1)){
+            index <- params$missing_index[i]
+            name <- params$part[[index]]
+            current_data <- data[,name]
+            data[params$missing_value[[i]], name] <- median(current_data[which(!is.na(current_data))])
+        }
+    }
+    
         
     # go through each numeric data by defined
     for (i in seq(1, length(params$added), by=1)) {
@@ -126,9 +126,12 @@ doProcessing <- function(data, mode, params) {
         # define rearrange data
         name = params$added[[i]]
         current_data <- data[[name]]
-        rearrange_ranger <- c(min(current_data)-1)
-        rearrange_ranger <- c(rearrange_ranger, params$ranger[[i]])
-        rearrange_ranger <- c(rearrange_ranger, max(current_data)+1)
+        
+        if (part != 3) {
+            rearrange_ranger <- c(min(current_data)-1)
+            rearrange_ranger <- c(rearrange_ranger, params$ranger[[i]])
+            rearrange_ranger <- c(rearrange_ranger, max(current_data)+1)
+        }
         
         # rename added columns
         for(j in 1:2) {
@@ -137,8 +140,14 @@ doProcessing <- function(data, mode, params) {
             current_postfix <- add_postfix[[j]]
             add_colname <- paste(name, current_postfix, sep="")
             
-            # cut bins
-            current_coldata <- cut(current_data, rearrange_ranger)
+            if (part == 3) {
+                # revalue
+                current_coldata <- sapply(current_data, function(x) {ifelse(x==3, 1,x)})
+            }else {
+                # cut bins
+                current_coldata <- cut(current_data, rearrange_ranger)
+            }
+            
 
             # add new data to specific place
             if (j==1){
@@ -151,15 +160,16 @@ doProcessing <- function(data, mode, params) {
          
     }
     
+    
     # plot 
     if (mode == "train") {
-
+        
         # get headers and plot
         headers <- get_headers(data, params, mode, headers)
         headers <- c(headers, answer_column)
-    
+
         # do correlation
-        do_corr_process(data)
+        do_corr_process(data[headers], headers, params$id)
     } else {
         
         # get headers
@@ -170,10 +180,10 @@ doProcessing <- function(data, mode, params) {
     first_part_processed_data <- data.frame(data[headers])
     names(first_part_processed_data) <- headers
     write.table(first_part_processed_data,
-                            file = paste0(getwd(), first_csv, mode, ".csv"),
-                            quote = T,
-                            sep = ",",
-                            row.names = F)
+                file = paste0(getwd(), params$csv, mode, ".csv"),
+                quote = T,
+                sep = ",",
+                row.names = F)
 }
 
 # =====================================================================================
@@ -185,11 +195,11 @@ message("Start Processing")
 
 # process training data
 data <- read.csv(paste0(getwd(), "/data/train.csv"))
-doProcessing(data, "train", params[[as.character(part)]])
+doProcessing(data, "train", params[[as.character(part)]], part)
 
 # process testing data
 data <- read.csv(paste0(getwd(), "/data/test.csv"))
-doProcessing(data, "test", params[[as.character(part)]])
+doProcessing(data, "test", params[[as.character(part)]], part)
 
 # log info
 message("Finish Processing")
