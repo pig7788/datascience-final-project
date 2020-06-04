@@ -25,6 +25,9 @@ do_corr_process <- function(data) {
                                     data$chest_pain,
                                     data$resting_bp,
                                     data$cholestoral,
+                                    # data$thalium_scan,
+                                    # data$slope,
+                                    # data$vessels,
                                     data$heart_disease)
   headers <- c("id",
                "age",
@@ -32,12 +35,15 @@ do_corr_process <- function(data) {
                "chest_pain",
                "resting_bp",
                "cholestoral",
+               # "thalium_scan",
+               # "slope",
+               # "vessels",
                "heart_disease")
 
   names(corr_processed_data) <- headers
   
   corr_matrix <- cor(corr_processed_data)
-  
+
   save2img(corr_matrix, "/plots/first_part_corr_plot.png", "corr", "", "", "")
 }
 
@@ -54,6 +60,16 @@ doProcessing <- function(data, mode) {
   data$cholestoral_interval_without_label <- as.numeric(cholestoral_cut)
   data$cholestoral_interval_with_label <- cholestoral_cut
   
+  # mapping 3, 6, 7 to 1, 2, 3 on thalium_scan
+  data$thalium_scan_label <- sapply(data$thalium_scan, function(x) {ifelse(x==3, 1,x)})
+  data$thalium_scan_label <- sapply(data$thalium_scan_label, function(x) {ifelse(x==6, 2,x)})
+  data$thalium_scan_label <- sapply(data$thalium_scan_label, function(x) {ifelse(x==7, 3,x)})
+
+  # missing data of vessels <-  data[c(123,147,220,228),]
+  # missing data of thalium_scan <-  data[c(63,201),]
+  
+  
+  
   headers <- c("id",
                "age",
                "age_interval_without_label",
@@ -65,7 +81,11 @@ doProcessing <- function(data, mode) {
                "resting_bp_interval_with_label",
                "cholestoral",
                "cholestoral_interval_without_label",
-               "cholestoral_interval_with_label")
+               "cholestoral_interval_with_label",
+               "thalium_scan",
+               "thalium_scan_label",
+               "slope",
+               "vessels")
   if (mode == "train") {
     # age plots
     save2img(data$age_interval_with_label, "/plots/age_interval_barplot.png", "bar", "Age Bar Plot", "Age Interval", "Count")
@@ -85,6 +105,15 @@ doProcessing <- function(data, mode) {
     save2img(data$cholestoral_interval_with_label, "/plots/cholestoral_interval_barplot.png", "bar", "Cholestoral Bar Plot", "Cholestoral Interval", "Count")
     save2img(data$cholestoral, "/plots/cholestoral_boxplot.png", "box", "Cholestoral Box Plot", "Cholestoral", "Range") 
     
+    # slope plot
+    save2img(data$slope, "/plots/slope_barplot.png", "bar", "Slope Bar Plot", "slope", "Count")
+    
+    # vessels plot
+    save2img(data$vessels, "/plots/vessels_barplot.png", "bar", "Vessels Bar Plot", "vessels", "Count")
+    
+    # thalium_scan plot
+    save2img(data$thalium_scan, "/plots/thalium_scan_barplot.png", "bar", "Thalium_scan Bar Plot", "thalium_scan", "Count")
+    
     do_corr_process(data)
     
     headers <- c(headers, "heart_disease")
@@ -100,6 +129,10 @@ doProcessing <- function(data, mode) {
                                             data$cholestoral,
                                             data$cholestoral_interval_without_label,
                                             data$cholestoral_interval_with_label,
+                                            data$thalium_scan,
+                                            data$thalium_scan_label,
+                                            data$slope,
+                                            data$vessels,
                                             data$heart_disease)
   } else {
     first_part_processed_data <- data.frame(data$id,
@@ -113,7 +146,12 @@ doProcessing <- function(data, mode) {
                                             data$resting_bp_interval_with_label,
                                             data$cholestoral,
                                             data$cholestoral_interval_without_label,
-                                            data$cholestoral_interval_with_label)
+                                            data$cholestoral_interval_with_label,
+                                            data$thalium_scan,
+                                            data$thalium_scan_label,
+                                            data$slope,
+                                            data$vessels
+                                            )
   }
   
   
