@@ -73,13 +73,13 @@ do_corr_process <- function(data, headers, id) {
 get_headers <- function(data, params, mode, headers){
     total_col <- names(data)
     for (i in seq(2, length(total_col), by=1)) {
-        colname <- total_col[[i]]
-        current_data <- data[[colname]]
-        if (!str_detect(colname, "without_label")){
-            headers <- c(headers, colname)
+        ori_colname <- total_col[[i]]
+        current_data <- data[[ori_colname]]
+        if (!str_detect(ori_colname, "without_label")){
+            headers <- c(headers, ori_colname)
         }
         for (j in seq(1, length(plot_kind), by=1)){
-            colname <- str_replace_all(colname, "_", " ")
+            colname <- str_replace_all(ori_colname, "_", " ")
             Cap_colname <- CapStr(colname)
             if (mode == "train") {
                 type <- plot_kind[[j]][[1]]
@@ -101,7 +101,7 @@ get_headers <- function(data, params, mode, headers){
                     x_title <- paste(Cap_colname, plot_kind[[j]][[2]], sep=" ")
                 }
                 y_title <- plot_kind[[j]][[3]]
-                file_name = paste(plot_dir, "/", colname, "_", type, "plot.png", sep="")
+                file_name = paste(plot_dir, "/", ori_colname, "_", type, "plot.png", sep="")
                 save2img(current_data, file_name, type, main_title, x_title, y_title)
             }
         }
@@ -285,8 +285,12 @@ doProcessing <- function(data, mode, params, part) {
             current_postfix <- add_postfix[[j]]
             add_colname <- paste(name, current_postfix, sep="")
             if (part == 3) {
+                
                 # revalue
                 current_coldata <- sapply(current_data, function(x) {ifelse(x==3, 1,x)})
+                current_coldata <- sapply(data$thalium_scan, function(x) {ifelse(x==6, 2,x)})
+                current_coldata <- sapply(data$thalium_scan, function(x) {ifelse(x==7, 3,x)})
+
             }else {
                 # cut bins
                 current_coldata <- cut(current_data, rearrange_ranger)
@@ -295,7 +299,7 @@ doProcessing <- function(data, mode, params, part) {
             if (j==1){
                 data <- add_column(data, !!(add_colname):=as.numeric(current_coldata), .after = grep(name, colnames(data)))
             }else{
-                data <- add_column(data, !!(add_colname):=as.numeric(current_coldata), .after = grep(paste(name, add_postfix[[1]], sep=""), colnames(data)))
+                data <- add_column(data, !!(add_colname):=current_coldata, .after = grep(paste(name, add_postfix[[1]], sep=""), colnames(data)))
             }
         }
     }
