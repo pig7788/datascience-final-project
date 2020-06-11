@@ -2,6 +2,7 @@
 library(hash)
 library(tibble)
 library(infotheo)
+library(stringr)
 
 # define three part columns
 index_column <- c("id")
@@ -22,10 +23,7 @@ second_hypothesis <- c("high_sugar", "ecg", "exercise_angina")
 third_hypothesis <- c()
 
 # define plot information, make sure the length is as same as part
-plot_kind <- list(a=c("box", "Range"), b=c("bar", "Count"))
-first_plot <- c(0, 2, 2, 2, 2, 2)
-second_plot <- c(0, 2, 2, 2, 2, 2, 2)
-third_plot <- c(0, 2, 2,2)
+plot_kind <- list(a=c("Box", "Box Plot", "Range"), b=c("Bar", "", "Count"))
 
 # define new csv file name
 first_csv <- "/data/first_part/first_part_processed_data_"
@@ -34,18 +32,24 @@ third_csv <- "/data/third_part/third_part_processed_data_"
 
 # hash dictionary
 params <- hash()
-params[["1"]] <- list(id="first", csv=first_csv, part=first_part, added=first_added, answer=answer_column, plot=first_plot, ranger=list(a=c(17, 40, 65), b=c(120, 139), c=c(129, 200, 239)))
-params[["2"]] <- list(id="second", hypothesis=second_hypothesis, csv=second_csv, part=second_part, added=second_added, answer=answer_column, plot=second_plot, ranger=list())
-params[["3"]] <- list(id="third",  csv=third_csv, part=third_part, added=third_added, answer=answer_column, plot=third_plot, ranger=list())
+params[["1"]] <- list(id="first", csv=first_csv, part=first_part, added=first_added, answer=answer_column, ranger=list(a=c(17, 40, 65), b=c(120, 139), c=c(129, 200, 239)))
+params[["2"]] <- list(id="second", hypothesis=second_hypothesis, csv=second_csv, part=second_part, added=second_added, answer=answer_column, ranger=list())
+params[["3"]] <- list(id="third",  csv=third_csv, part=third_part, added=third_added, answer=answer_column, ranger=list())
 
 # define some function
+CapStr <- function(y) {
+    c <- strsplit(y, " ")[[1]]
+    string <- paste(toupper(substring(c, 1,1)), substring(c, 2), sep="", collapse=" ")
+    return(string)
+}
+
 save2img <- function(target, file_name, plot_type, main_title, x_title, y_title) {
     png(filename = paste0(getwd(), file_name))
     
-    if (plot_type == "bar") {
+    if (plot_type == "Bar") {
         data_table <- table(target)
         barplot(data_table, main = main_title, xlab = x_title, ylab = y_title) 
-    } else if (plot_type == "box") {
+    } else if (plot_type == "Box") {
         boxplot(target, main = main_title, xlab = x_title, ylab = y_title)
     } else if (plot_type == "corr") {
         if (!require(ggcorrplot)) {
@@ -67,32 +71,38 @@ do_corr_process <- function(data, headers, id) {
 }
 
 get_headers <- function(data, params, mode, headers){
-    for (i in seq(1, length(params$part), by=1)) {
-        plot_num <- params$plot[[i]]
-        index_bf <- which(colnames(data)==params$part[[i]])
-        if (i==length(params$part)){
-            if (plot_num > 1){
-                index_af <- index_bf + 3
-            }else {
-                index_af <- index_bf
-            }
-        }else {
-            index_af <- which(colnames(data)==params$part[[i+1]])
+    total_col <- names(data)
+    for (i in seq(2, length(total_col), by=1)) {
+        colname <- total_col[[i]]
+        current_data <- data[[colname]]
+        if (!str_detect(colname, "without_label")){
+            headers <- c(headers, colname)
         }
-        if (plot_num > 0){
-            for (k in seq(index_bf, index_af, by=2)){
-                for (j in 1:plot_num){
-                    colname <- names(data)[[k]]
-                    headers <- c(headers, colname)
-                    if (mode == "train") {
-                        type <- plot_kind[[j]][[1]]
-                        main_title <- paste(colname, type, "plot", sep="")
-                        x_title <- colname
-                        y_title <- plot_kind[[j]][[2]]
-                        file_name = paste(plot_dir, "/", colname, "_", type, "plot.png", sep="")
-                        save2img(data[[colname]], file_name, type, main_title, x_title, y_title)
+        for (j in seq(1, length(plot_kind), by=1)){
+            colname <- str_replace_all(colname, "_", " ")
+            Cap_colname <- CapStr(colname)
+            if (mode == "train") {
+                type <- plot_kind[[j]][[1]]
+                main_title <- paste(Cap_colname, type, "Plot", sep=" ")
+                x_title <- ""
+                if (str_detect(Cap_colname, "With Label")){
+                    if (j==2){
+                        x_title <- str_replace_all(Cap_colname, "With Label", "Range Interval")
+                    } else {
+                        x_title <- paste(Cap_colname, plot_kind[[j]][[2]], "", sep=" ")
                     }
+                }else if (str_detect(Cap_colname, "Without Label")){
+                    if (j==2){
+                        x_title <- str_replace_all(Cap_colname, "Without Label", "Label")
+                    }else {
+                        x_title <- paste(Cap_colname, plot_kind[[j]][[2]], sep=" ")
+                    }
+                }else {
+                    x_title <- paste(Cap_colname, plot_kind[[j]][[2]], sep=" ")
                 }
+                y_title <- plot_kind[[j]][[3]]
+                file_name = paste(plot_dir, "/", colname, "_", type, "plot.png", sep="")
+                save2img(current_data, file_name, type, main_title, x_title, y_title)
             }
         }
     }
@@ -171,9 +181,23 @@ kmeans_ranger <- function(data, kmeans_ranger){
 
 doProcessing <- function(data, mode, params, part) {
   
-    add_postfix <- c("_without_label", "_with_label")
-    headers <- c(index_column)
+    add_postfix <- c("_with_label", "_without_label")
+    headers <- c()
+    current_header <- c()
     rearrange_ranger <- c()
+    
+    # define current header
+    for (i in params$part) {
+        if (i != "id") {
+            if (i %in% params$added){
+                current_header <- c(current_header, i)
+                current_header <- c(current_header, paste(i, add_postfix[[1]], sep=""))
+                current_header <- c(current_header, paste(i, add_postfix[[2]], sep=""))
+            }else {
+                current_header <- c(current_header, i)
+            }
+        }
+    }
     
     # missing value
     for (i in params$part){
@@ -257,11 +281,9 @@ doProcessing <- function(data, mode, params, part) {
         
         # rename added columns
         for(j in 1:2) {
-            
             # get new colname
             current_postfix <- add_postfix[[j]]
             add_colname <- paste(name, current_postfix, sep="")
-            
             if (part == 3) {
                 # revalue
                 current_coldata <- sapply(current_data, function(x) {ifelse(x==3, 1,x)})
@@ -269,24 +291,20 @@ doProcessing <- function(data, mode, params, part) {
                 # cut bins
                 current_coldata <- cut(current_data, rearrange_ranger)
             }
-            
-
             # add new data to specific place
             if (j==1){
                 data <- add_column(data, !!(add_colname):=as.numeric(current_coldata), .after = grep(name, colnames(data)))
             }else{
                 data <- add_column(data, !!(add_colname):=as.numeric(current_coldata), .after = grep(paste(name, add_postfix[[1]], sep=""), colnames(data)))
             }
-            
         }
-         
     }
     
     # plot 
     if (mode == "train") {
         
         # get headers and plot
-        headers <- get_headers(data, params, mode, headers)
+        headers <- get_headers(data[current_header], params, mode, headers)
         headers <- c(headers, answer_column)
 
         # do correlation
@@ -294,10 +312,12 @@ doProcessing <- function(data, mode, params, part) {
     } else {
         
         # get headers
-        headers <- get_headers(data, params, mode, headers)
+        headers <- get_headers(data[current_header], params, mode, headers)
     }
     
     # ready to save new csv
+    # add index column
+    headers <- c(index_column, headers)
     first_part_processed_data <- data.frame(data[headers])
     names(first_part_processed_data) <- headers
     write.table(first_part_processed_data,
