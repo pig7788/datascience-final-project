@@ -1,4 +1,4 @@
-"id","age_with_label","sex","chest_pain","resting_bp","resting_bp_with_label","cholestoral","cholestoral_with_label"
+"id","age_without_label","sex","chest_pain","resting_bp","resting_bp_without_label","cholestoral","cholestoral_without_label"
 179,3,1,3,130,2,564,4
 14,3,1,2,120,1,263,4
 195,4,0,3,120,1,211,3

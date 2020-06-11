@@ -75,34 +75,44 @@ get_headers <- function(data, params, mode, headers){
     for (i in seq(2, length(total_col), by=1)) {
         ori_colname <- total_col[[i]]
         current_data <- data[[ori_colname]]
-        if (!str_detect(ori_colname, "without_label")){
+        if (!str_detect(ori_colname, "with_label")){
             headers <- c(headers, ori_colname)
         }
         for (j in seq(1, length(plot_kind), by=1)){
             colname <- str_replace_all(ori_colname, "_", " ")
             Cap_colname <- CapStr(colname)
             if (mode == "train") {
+              
+                # define others
                 type <- plot_kind[[j]][[1]]
                 main_title <- paste(Cap_colname, type, "Plot", sep=" ")
+                
+                # define x title
                 x_title <- ""
                 if (str_detect(Cap_colname, "With Label")){
                     if (j==2){
-                        x_title <- str_replace_all(Cap_colname, "With Label", "Range Interval")
+                        x_title <- str_replace_all(Cap_colname, "With Label", "Label")
                     } else {
                         x_title <- paste(Cap_colname, plot_kind[[j]][[2]], "", sep=" ")
                     }
                 }else if (str_detect(Cap_colname, "Without Label")){
                     if (j==2){
-                        x_title <- str_replace_all(Cap_colname, "Without Label", "Label")
+                        x_title <- str_replace_all(Cap_colname, "Without Label", "Range Interval")
                     }else {
                         x_title <- paste(Cap_colname, plot_kind[[j]][[2]], sep=" ")
                     }
                 }else {
                     x_title <- paste(Cap_colname, plot_kind[[j]][[2]], sep=" ")
                 }
+                
+                # define others
                 y_title <- plot_kind[[j]][[3]]
                 file_name = paste(plot_dir, "/", ori_colname, "_", type, "plot.png", sep="")
-                save2img(current_data, file_name, type, main_title, x_title, y_title)
+                
+                if (!(str_detect(Cap_colname, "With Label") && type == "Box")){
+                    save2img(current_data, file_name, type, main_title, x_title, y_title)
+                }
+                
             }
         }
     }
@@ -181,7 +191,7 @@ kmeans_ranger <- function(data, kmeans_ranger){
 
 doProcessing <- function(data, mode, params, part) {
   
-    add_postfix <- c("_with_label", "_without_label")
+    add_postfix <- c("_without_label", "_with_label")
     headers <- c()
     current_header <- c()
     rearrange_ranger <- c()
@@ -295,6 +305,7 @@ doProcessing <- function(data, mode, params, part) {
                 # cut bins
                 current_coldata <- cut(current_data, rearrange_ranger)
             }
+
             # add new data to specific place
             if (j==1){
                 data <- add_column(data, !!(add_colname):=as.numeric(current_coldata), .after = grep(name, colnames(data)))
